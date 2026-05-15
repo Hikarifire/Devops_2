@@ -200,7 +200,7 @@ resource "aws_ecs_task_definition" "app" {
   container_definitions = jsonencode([
 
     {
-      name  = "backend"
+      name  = "back-Ventas_SpringBoot"
       image = "${aws_ecr_repository.backend.repository_url}:latest"
 
       portMappings = [
@@ -215,6 +215,52 @@ resource "aws_ecs_task_definition" "app" {
         retries     = 5
         startPeriod = 120
       }
+
+
+      environment = [
+        {
+            name  = "DB_HOST",
+            value = aws_instance.db.private_ip
+        },
+        {
+            name  = "SPRING_DATASOURCE_URL"
+            value = "jdbc:mysql://${aws_instance.db.private_ip}:3306/asistencia_db"
+        },
+        {
+            name  = "SPRING_DATASOURCE_USERNAME"
+            value = "root"
+        },
+        {
+            name  = "SPRING_DATASOURCE_PASSWORD"
+            value = "root"
+        }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs",
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.ecs.name,
+          awslogs-region        = var.aws_region,
+          awslogs-stream-prefix = "backend"
+        }
+      }
+    },
+ {
+      name  = "back-Despachos_SpringBoot"
+      image = "${aws_ecr_repository.backend.repository_url}:latest"
+
+      portMappings = [
+        {
+          containerPort = 8080
+        }
+      ]
+      healthCheck = {
+        command     = ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health/readiness || exit 1"]
+        interval    = 30
+        timeout     = 5
+        retries     = 5
+        startPeriod = 120
+      }
+
 
       environment = [
         {
@@ -245,7 +291,7 @@ resource "aws_ecs_task_definition" "app" {
     },
 
     {
-      name  = "frontend"
+      name  = "front_despacho"
       image = "${aws_ecr_repository.frontend.repository_url}:latest"
 
       portMappings = [
@@ -256,7 +302,7 @@ resource "aws_ecs_task_definition" "app" {
 
       dependsOn = [
         {
-          containerName = "backend",
+          containerName = "back-Despachos_SpringBoot",
           condition = "START"
         }
       ]
@@ -268,6 +314,7 @@ resource "aws_ecs_task_definition" "app" {
           awslogs-stream-prefix = "frontend"
         }
       }
+      
     }
 
   ])
