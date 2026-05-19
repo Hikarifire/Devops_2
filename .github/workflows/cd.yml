@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout del código
+      - name: comprobando código
         uses: actions/checkout@v3
 
       - name: Configurar credenciales AWS
