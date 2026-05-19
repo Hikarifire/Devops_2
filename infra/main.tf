@@ -72,6 +72,13 @@ resource "aws_security_group" "main" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+  
+  ingress {
+    from_port   = 8081
+    to_port     = 8081
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
   egress {
     from_port   = 0
@@ -80,6 +87,7 @@ resource "aws_security_group" "main" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
+
 resource "aws_security_group_rule" "mysql_internal" {
   type                     = "ingress"
   from_port                = 3306
@@ -94,7 +102,11 @@ resource "aws_security_group_rule" "mysql_internal" {
 ############################
 
 resource "aws_ecr_repository" "backend" {
-  name         = "${var.project_name}-backend"
+  name         = "${var.project_name}-backd-despacho"
+  force_delete = true
+}
+resource "aws_ecr_repository" "backend" {
+  name         = "${var.project_name}-backventas"
   force_delete = true
 }
 
@@ -196,11 +208,13 @@ resource "aws_ecs_task_definition" "app" {
   cpu                      = "1024"
   memory                   = "2048"
   execution_role_arn       = data.aws_iam_role.lab.arn
+  task_role_arn            = null
 
   container_definitions = jsonencode([
 
-    {
-      name  = "back-Ventas_SpringBoot"
+    
+ {
+      name  = "back-Despachos"
       image = "${aws_ecr_repository.backend.repository_url}:latest"
 
       portMappings = [
@@ -218,40 +232,30 @@ resource "aws_ecs_task_definition" "app" {
 
 
       environment = [
-        {
-            name  = "DB_HOST",
-            value = aws_instance.db.private_ip
-        },
-        {
-            name  = "SPRING_DATASOURCE_URL"
-            value = "jdbc:mysql://${aws_instance.db.private_ip}:3306/asistencia_db"
-        },
-        {
-            name  = "SPRING_DATASOURCE_USERNAME"
-            value = "root"
-        },
-        {
-            name  = "SPRING_DATASOURCE_PASSWORD"
-            value = "root"
-        }
+        { name = "SPRING_DATASOURCE_URL", 
+          value = "jdbc:mysql://${aws_instance.db.private_ip}:3306/${var.db_name}?useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true" },
+        { name = "SPRING_DATASOURCE_USERNAME", 
+          value = "root" },
+        { name = "SPRING_DATASOURCE_PASSWORD", 
+          value = var.db_password },
+        { name = "DB_HOST", 
+          value = aws_instance.db.private_ip }
       ]
       logConfiguration = {
         logDriver = "awslogs",
         options = {
           awslogs-group         = aws_cloudwatch_log_group.ecs.name,
           awslogs-region        = var.aws_region,
-          awslogs-stream-prefix = "backend"
+          awslogs-stream-prefix = "back-despachos"
         }
       }
     },
- {
-      name  = "back-Despachos_SpringBoot"
-      image = "${aws_ecr_repository.backend.repository_url}:latest"
 
+    {
+      name  = "back-Ventas"
+      image = "${aws_ecr_repository.backend.repository_url}:latest"
       portMappings = [
-        {
-          containerPort = 8080
-        }
+        {containerPort = 8080}
       ]
       healthCheck = {
         command     = ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health/readiness || exit 1"]
@@ -261,31 +265,22 @@ resource "aws_ecs_task_definition" "app" {
         startPeriod = 120
       }
 
-
       environment = [
-        {
-            name  = "DB_HOST",
-            value = aws_instance.db.private_ip
-        },
-        {
-            name  = "SPRING_DATASOURCE_URL"
-            value = "jdbc:mysql://${aws_instance.db.private_ip}:3306/asistencia_db"
-        },
-        {
-            name  = "SPRING_DATASOURCE_USERNAME"
-            value = "root"
-        },
-        {
-            name  = "SPRING_DATASOURCE_PASSWORD"
-            value = "root"
-        }
+        { name = "SPRING_DATASOURCE_URL",      
+          value = "jdbc:mysql://${aws_instance.db.private_ip}:3306/${var.db_name}?useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true" },
+        { name = "SPRING_DATASOURCE_USERNAME", 
+          value = "root" },
+        { name = "SPRING_DATASOURCE_PASSWORD", 
+          value = var.db_password },
+        { name = "DB_HOST", 
+          value = aws_instance.db.private_ip }
       ]
       logConfiguration = {
         logDriver = "awslogs",
         options = {
           awslogs-group         = aws_cloudwatch_log_group.ecs.name,
           awslogs-region        = var.aws_region,
-          awslogs-stream-prefix = "backend"
+          awslogs-stream-prefix = "back-ventas"
         }
       }
     },
@@ -301,10 +296,10 @@ resource "aws_ecs_task_definition" "app" {
       ]
 
       dependsOn = [
-        {
-          containerName = "back-Despachos_SpringBoot",
-          condition = "START"
-        }
+        { containerName = "backend-despachos", 
+          condition = "START" },
+        { containerName = "backend-ventas",    
+          condition = "START" }
       ]
       logConfiguration = {
         logDriver = "awslogs",
