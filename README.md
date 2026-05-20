@@ -1,16 +1,16 @@
-# 📦 App de Despachos y Ventas
+#  App de Despachos y Ventas
 
 Sistema de gestión integral que permite a las empresas administrar de forma separada y escalable sus operaciones de despacho y ventas. Cuenta con una interfaz web moderna y despliegue automatizado en la nube de AWS.
 
 ---
 
-## 🌟 Descripción General
+##  Descripción General
 
 Este proyecto es un sistema basado en microservicios. Consta de una interfaz web (Frontend) y dos servicios de respaldo (Backends) totalmente independientes. Todo el sistema funciona dentro de contenedores, está alojado en la nube de AWS y se construye utilizando **Infraestructura como Código (Terraform)**, lo que permite crearlo y destruirlo de forma rápida y segura.
 
 ---
 
-## 🏗️ Arquitectura del Sistema
+##  Arquitectura del Sistema
 
 El sistema funciona en la nube de AWS y se divide en las siguientes partes:
 
@@ -26,19 +26,19 @@ El sistema funciona en la nube de AWS y se divide en las siguientes partes:
 
 ---
 
-## 💻 Stack Tecnológico
+##  Tecnológias utilizadas
 
 | Capa | Tecnologías |
 | :--- | :--- |
 | **Frontend** | React 18, Vite, TailwindCSS |
 | **Backend** | Java 21, Spring Boot 3.x |
 | **Base de Datos** | MySQL 8.0 |
-| **Infraestructura** | AWS (ECS Fargate, ECR, EC2, VPC) |
+| **Infraestructura** | AWS (ECS , ECR, EC2, VPC) |
 | **Automatización** | Terraform, GitHub Actions, Docker |
 
 ---
 
-## 📁 Estructura del Proyecto
+##  Estructura del Proyecto
 
 El monorepo está organizado de la siguiente manera:
 
