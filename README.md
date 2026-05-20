@@ -1,135 +1,159 @@
-## 📑 Tabla de Contenidos
+# 📦 App de Despachos y Ventas
 
-1. [Descripción General](#-descripción-general)
-2. [Arquitectura del Sistema](#-arquitectura-del-sistema)
-3. [Microservicios](#-microservicios)
-4. [Stack Tecnológico](#-stack-tecnológico)
-5. [Patrones y Estándares](#-patrones-y-estándares)
-6. [Transacciones Distribuidas](#-transacciones-distribuidas)
-7. [Manejo de Errores](#-manejo-de-errores)
-8. [Infraestructura](#-infraestructura)
-9. [Estructura del Proyecto](#-estructura-del-proyecto)
-10. [Configuración del Entorno](#-configuración-del-entorno)
-11. [Ejecución Local](#-ejecución-local)
-12. [CI/CD y Observabilidad](#-cicd-y-observabilidad)
-13. [Pruebas](#-pruebas)
-14. [Frontend Detallado](#-frontend-detallado)
-15. [Roadmap](#-roadmap)
-16. [Contribución](#-contribución)
+Sistema de gestión integral que permite a las empresas administrar de forma separada y escalable sus operaciones de despacho y ventas. Cuenta con una interfaz web moderna y despliegue automatizado en la nube de AWS.
 
 ---
 
 ## 🌟 Descripción General
 
-Este proyecto es un sistema de gestión integral que combina un frontend en React con dos microservicios Spring Boot independientes para gestionar operaciones de despachos y ventas. El sistema está completamente contenerizado y desplegado en AWS Fargate utilizando infraestructura como código con **Terraform** y un pipeline de CI/CD automatizado con **GitHub Actions**.
-
-**Problema que resuelve:** Permite a las empresas gestionar de forma separada y escalable las operaciones de despacho y ventas, con una interfaz de usuario moderna y despliegue automatizado en la nube.
+Este proyecto es un sistema basado en microservicios. Consta de una interfaz web (Frontend) y dos servicios de respaldo (Backends) totalmente independientes. Todo el sistema funciona dentro de contenedores, está alojado en la nube de AWS y se construye utilizando **Infraestructura como Código (Terraform)**, lo que permite crearlo y destruirlo de forma rápida y segura.
 
 ---
 
 ## 🏗️ Arquitectura del Sistema
+El sistema consta de:
+1. **Frontend (React):** Interfaz web alojada en Nginx.
+2. **Backend Despachos (Spring Boot):** API para logística y envíos.
+3. **Backend Ventas (Spring Boot):** API para facturación y clientes.
+4. **Base de Datos:** MySQL 8.0 alojada en AWS EC2.
 
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│                         AWS Cloud                               │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                    VPC (10.0.0.0/16)                     │   │
-│  │  ┌────────────────────────────────────────────────────┐  │   │
-│  │  │              Public Subnet (10.0.1.0/24)           │  │   │
-│  │  │  ┌──────────────────────────────────────────────┐  │  │   │
-│  │  │  │            ECS Fargate Cluster               │  │  │   │
-│  │  │  │  ┌────────────────────────────────────────┐  │  │  │   │
-│  │  │  │  │  Task: <nombre_proyecto>-app           │  │  │  │   │
-│  │  │  │  │  ├── frontend (Nginx, puerto 80)       │  │  │  │   │
-│  │  │  │  │  ├── backend-despachos (puerto 8080)   │  │  │  │   │
-│  │  │  │  │  └── backend-ventas (puerto 8081)      │  │  │  │   │
-│  │  │  │  └────────────────────────────────────────┘  │  │  │   │
-│  │  │  └──────────────────────────────────────────────┘  │  │   │
-│  │  │                                                     │  │   │
-│  │  │  ┌──────────────────────────────────────────────┐  │  │   │
-│  │  │  │    EC2 Instance (MySQL 8.0)                  │  │  │   │
-│  │  │  │    - Docker container con MySQL              │  │  │   │
-│  │  │  │    - Puerto 3306 expuesto internamente       │  │  │   │
-│  │  │  └──────────────────────────────────────────────┘  │  │   │
-│  │  └────────────────────────────────────────────────────┘  │   │
-│  │                                                           │   │
-│  │  ┌────────────────────────────────────────────────────┐  │   │
-│  │  │              ECR Repositories                      │  │   │
-│  │  │  - <nombre_proyecto>-backend-despachos             │  │   │
-│  │  │  - <nombre_proyecto>-backend-ventas                │  │   │
-│  │  │  - <nombre_proyecto>-frontend                      │  │   │
-│  │  └────────────────────────────────────────────────────┘  │   │
-│  └──────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
-Flujo de Comunicación:Usuario → Frontend (React) alojado en Nginx.Frontend → Backend APIs mediante HTTP (puertos 8080 y 8081).Backends → MySQL en EC2 (puerto 3306) para persistencia.Logs → Envío a CloudWatch Logs para monitoreo centralizado.🧩 Microservicios1. Backend Despachos (despacho-service)Puerto: 8080Responsabilidad: Gestión de despachos, seguimiento de envíos, logística.Documentación API: Swagger UI disponible en /swagger-ui.html.2. Backend Ventas (venta-service)Puerto: 8081Responsabilidad: Gestión de ventas, facturación, clientes.Documentación API: Swagger UI disponible en /swagger-ui.html.3. Frontend (frontend)Tecnología: React 18 + Vite + TailwindCSS.Servidor: Nginx (servidor web ligero y rápido).Routing / Estado: React Router DOM v6 / React Hooks.💻 Stack TecnológicoCapaTecnologíasFrontendReact 18, Vite 5, TailwindCSS 3, pnpm, NginxBackendJava 21, Spring Boot 3.x, Spring Data JPA, MavenBase de DatosMySQL 8.0 (Oracle) en contenedor DockerInfraestructuraAWS (VPC, ECS Fargate, ECR, EC2, CloudWatch), TerraformCI/CDGitHub Actions, Docker Build, ECS DeploymentHealth ChecksSpring Boot Actuator, Swagger UI, netcat (nc)DocumentaciónSpringDoc OpenAPI (Swagger)Dependencias PrincipalesFrontend (package.json):JSON{
-  "react": "^18.2.0",
-  "react-dom": "^18.2.0",
-  "react-router-dom": "^6.24.1",
-  "react-hook-form": "^7.52.1",
-  "react-icons": "^5.1.0",
-  "axios": "^1.6.8",
-  "sweetalert2": "^11.11.0"
-}
-Backend (Spring Boot Starters):web, data-jpa, actuator, mysql-connector-java, springdoc-openapi-starter-webmvc-ui.📐 Patrones y EstándaresPatrones de Diseño:API Gateway implícito: El frontend consume directamente los dos microservicios.Database per Service: Cada microservicio tiene su propia base de datos (actualmente comparten instancia MySQL pero están aislados por esquema lógico).Service Discovery: No implementado (comunicación directa por IP).Configuración externalizada: Variables de entorno para credenciales y conexiones.Estándares de Código:Frontend: ESLint + Prettier.Backend: Estándar Java 21, convenciones Spring Boot.🔄 Transacciones DistribuidasEstado actual: No se implementan transacciones distribuidas entre microservicios. Cada servicio gestiona sus propias transacciones locales.Propuesta de implementación futura (SAGA Pattern):Para operaciones que cruzan ambos servicios (ej. crear venta y agendar despacho), se sugiere implementar:Coreografía de eventos con RabbitMQ (ya contemplado en futura infraestructura).Orquestación con temporal.io o AWS Step Functions.Estrategia actual para consistencia:Eventual consistency: Si falla una operación secundaria, se registra en logs y se alerta.Circuit Breaker: Planificado usando Resilience4j en futuras iteraciones.🛡️ Manejo de ErroresEstrategias ImplementadasComponenteMecanismoDescripciónBackendspring.sql.init.continue-on-error=trueNo falla si hay errores en scripts SQL inicialesBackendhikari.initializationFailTimeout=-1Espera indefinidamente a que MySQL esté disponibleBackendHealth checks /swagger-ui.htmlECS monitorea la salud del servicio continuamenteBackendEntrypoint con nc -z $DB_HOST 3306Espera activa a MySQL antes de iniciar Spring BootFrontendHEALTHCHECK en NginxECS sabe si el frontend está vivoFrontenddependsOn (ECS)El frontend espera a que los backends inicienNota sobre fallos específicos: Si MySQL no está disponible al inicio, Spring Boot espera, los health checks fallan y ECS reiniciará el contenedor (hasta 5 reintentos) hasta que MySQL termine de arrancar (EC2 tarda ~2 mins).☁️ Infraestructura (Terraform)La infraestructura está dividida en módulos .tf para fácil mantenimiento:RecursoPropósitoVPC & SubnetsRed aislada (10.0.0.0/16), Subred Pública (10.0.1.0/24)Internet Gateway & RutasSalida a internet (0.0.0.0/0)Security GroupPuertos 22, 80, 8080, 8081, 3306 abiertos internamenteEC2 MySQLInstancia t3.micro, 30GB gp3, user_data con DockerECR Repositories3 repositorios para almacenar imágenes DockerECS Cluster & TaskFargate modo awsvpc, CPU 1024, RAM 2048CloudWatch LogsGrupo /ecs/<nombre_proyecto> con retención de 7 díasIAM RoleLabRole (proporcionado por AWS Academy)📂 Estructura del ProyectoPlaintextdespacho-project/
-├── .github/workflows/
-│   └── cd.yml                    # Pipeline CI/CD de GitHub Actions
-├── backend/
-│   ├── despacho-service/
-│   │   ├── Dockerfile            # Multi-stage, netcat health check
-│   │   ├── pom.xml               
-│   │   └── src/main/resources/application.properties
-│   └── venta-service/
-│       ├── Dockerfile            
-│       └── pom.xml
-├── frontend/
-│   ├── Dockerfile                # Node 22 + pnpm + Nginx
-│   ├── nginx.conf                # Configuración SPA + caching
-│   ├── package.json
-│   ├── vite.config.js
-│   ├── tailwind.config.js
-│   └── src/
-└── infrastructure/
-    ├── providers.tf              # AWS Provider
-    ├── vpc.tf                    # VPC, Subnets, IGW, Route Tables
-    ├── security_groups.tf        # SGs para ECS y EC2
-    ├── ecr.tf                    # Repositorios Docker
-    ├── instances.tf              # Servidor EC2 de Base de Datos
-    ├── ecs.tf                    # Cluster, Task Def, Service
-    ├── variables.tf              # Declaración de variables
-    └── terraform.tfvars.example  # Plantilla de variables
-⚙️ Configuración del EntornoVariables de Entorno (Inyectadas en ECS)SPRING_DATASOURCE_URL: Conexión JDBC (jdbc:mysql://<DB_HOST>:3306/<nombre_base_datos>?...)SPRING_DATASOURCE_USERNAME: rootSPRING_DATASOURCE_PASSWORD: (secreto gestionado por Terraform)DB_HOST: IP privada de EC2 MySQLArchivo terraform.tfvars (Requerido Localmente)Terraformclave_ec2           = "vockey"
-password_base_datos = "TuClaveSegura123"
-nombre_base_datos   = "despachodb"
-Secrets en GitHub (Para CI/CD)AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN (Del lab Academy)AWS_ACCOUNT_ID (ID de tu cuenta de 12 dígitos)🏃 Ejecución LocalRequisitos previos: Docker Desktop, Node.js 22 + pnpm, Java 17+ + Maven, MySQL local (opcional).Backends con DockerBash# Construir imagen
-docker build -t despacho-backend-test ./backend/despacho-service
+El código se despliega automáticamente en **AWS ECS Fargate** mediante GitHub Actions.
 
-# Ejecutar (requiere base de datos disponible)
+## 📂 Estructura del Repositorio
+Para conocer los detalles de cada componente, visita su documentación específica:
+
+* 🌐 [**Frontend**](./frontend/README.md): Código fuente de la interfaz web (React + Vite).
+* ⚙️ [**Backends**](./backend/README.md): Microservicios de ventas y despachos (Java Spring Boot).
+* ☁️ [**Infraestructura**](./infrastructure/README.md): Código de Terraform para levantar todo en AWS.
+* 🔄 **`.github/workflows`**: Pipeline de CI/CD automatizado.
+
+## 🚀 CI/CD y Observabilidad
+El proyecto utiliza **GitHub Actions**. Al integrar código en la rama `main`, el pipeline automáticamente:
+1. Construye las imágenes Docker.
+2. Las sube a AWS ECR.
+3. Actualiza los servicios en ECS Fargate sin tiempo de inactividad.
+
+Los logs centralizados se pueden visualizar en **AWS CloudWatch**.
+
+## 🤝 Contribución
+Crea una rama desde `develop`, realiza tus commits siguiendo la convención (`feat:`, `fix:`, `infra:`) y abre un Pull Request.
+2. Archivo de Infraestructura: infrastructure/README.md
+(Guárdalo dentro de la carpeta infrastructure)
+
+Markdown
+# ☁️ Infraestructura como Código (Terraform)
+
+Esta carpeta contiene todos los archivos `.tf` necesarios para desplegar la red, los servidores, los contenedores y las bases de datos en **AWS**.
+
+## 📁 Archivos Principales
+* `vpc.tf`: Configuración de la red aislada (Subnets, Gateway).
+* `security_groups.tf`: Reglas de firewall (Puertos 80, 8080, 8081, 3306).
+* `ecs.tf`: Clúster de contenedores Fargate para los microservicios.
+* `instances.tf`: Servidor EC2 ejecutando MySQL.
+* `ecr.tf`: Repositorios para imágenes Docker.
+
+## 🚀 Guía de Despliegue Local
+
+1. **Requisitos Previos:**
+   Tener instalado [Terraform](https://developer.hashicorp.com/terraform/downloads) y credenciales de AWS activas en tu terminal.
+
+2. **Configurar Variables:**
+   Copia el archivo de ejemplo y configúralo con tus datos:
+   ```bash
+   cp terraform.tfvars.example terraform.tfvars
+Edita terraform.tfvars con tu clave_ec2, el nombre y el password de la base de datos.
+
+Ejecutar Despliegue:
+
+Bash
+terraform init
+terraform validate
+terraform plan
+terraform apply
+⚠️ Aviso para AWS Academy: Usa End Lab para pausar los recursos. No uses Reset para no perder el estado de Terraform.
+
+
+---
+
+### 3. Archivo del Backend: `backend/README.md`
+*(Guárdalo dentro de la carpeta `backend`)*
+
+```markdown
+# ⚙️ Microservicios Backend
+
+Este directorio contiene los microservicios desarrollados en **Java 21** con **Spring Boot 3**. 
+
+## 🧩 Servicios Disponibles
+
+1. **`despacho-service` (Puerto 8080)**: Gestiona la logística y el estado de los envíos.
+2. **`venta-service` (Puerto 8081)**: Gestiona la facturación y la información de clientes.
+
+Ambos servicios utilizan una arquitectura *Database per Service* a nivel lógico (esquemas separados) y exponen su documentación API mediante **Swagger** en `/swagger-ui.html`.
+
+## 🛡️ Tolerancia a Fallos
+Implementan estrategias de resiliencia:
+* Espera activa a MySQL mediante un script `netcat` (`nc`) en el `Dockerfile`.
+* Timeout infinito de inicio en HikariCP para esperar a que la base de datos esté lista tras un reinicio de infraestructura.
+
+## 🏃 Ejecución Local con Docker
+
+Para probar un microservicio en tu máquina local:
+
+```bash
+# 1. Construir la imagen
+docker build -t despacho-backend-test ./despacho-service
+
+# 2. Ejecutar (Asegúrate de tener MySQL corriendo o ajustar las variables)
 docker run -p 8080:8080 \
   -e SPRING_DATASOURCE_URL=jdbc:mysql://host.docker.internal:3306/despachodb \
   -e SPRING_DATASOURCE_USERNAME=root \
-  -e SPRING_DATASOURCE_PASSWORD=password \
+  -e SPRING_DATASOURCE_PASSWORD=tu_password \
   despacho-backend-test
-Frontend LocalBashcd frontend
-pnpm install
-pnpm dev   # Abre http://localhost:5173
-🚀 CI/CD y ObservabilidadPipeline de GitHub ActionsTrigger: Push a la rama main.Jobs: Checkout -> Configurar AWS Credentials -> Login ECR -> Build & Push de 3 imágenes -> Forzar nuevo despliegue ECS (update-service --force-new-deployment).Duración típica: 3-5 minutos.Comandos Útiles (AWS CLI)Bash# Ver logs de backend-despachos
-aws logs get-log-events --log-group-name /ecs/<nombre_proyecto> --log-stream-name backend-despachos/xxxx
 
-# Forzar despliegue manual
-aws ecs update-service --cluster <nombre_proyecto>-cluster --service app --force-new-deployment
-🧪 PruebasBackend (Spring Boot): cd backend/despacho-service && mvn testFrontend: cd frontend && pnpm lint && pnpm buildPruebas de Integración (Post-Despliegue):Bashcurl http://<IP_PUBLICA>:8080/swagger-ui.html
-curl http://<IP_PUBLICA>:8081/swagger-ui.html
-🖥️ Frontend DetalladoServidor Nginx (Producción):Configurado para soportar SPA (React Router) y Cache de assets estáticos:Nginxserver {
-    listen 80;
-    root /usr/share/nginx/html;
-    try_files $uri $uri/ /index.html;  # Soporte React Router
+---
 
-    # Cache de assets estáticos por 1 año
-    location ~* \.(js|css|png|jpg)$ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-}
-Variables de Entorno (Vite): .env.productionFragmento de códigoVITE_API_DESPACHOS_URL=http://<IP_PUBLICA>:8080
+### 4. Archivo del Frontend: `frontend/README.md`
+*(Guárdalo dentro de la carpeta `frontend`)*
+
+```markdown
+# 🌐 Frontend Web
+
+Aplicación Single Page Application (SPA) construida con **React 18**, **Vite** y **TailwindCSS**.
+
+## 🛠️ Stack Tecnológico
+* **React Router DOM v6** para navegación.
+* **Axios** para peticiones HTTP a los microservicios.
+* **React Hook Form** para manejo de formularios.
+* Empaquetado en un contenedor Docker ultraligero usando **Nginx**.
+
+## ⚙️ Variables de Entorno
+Crea un archivo `.env.production` (o `.env.local` para pruebas) con las URLs de los microservicios:
+```env
+VITE_API_DESPACHOS_URL=http://<IP_PUBLICA>:8080
 VITE_API_VENTAS_URL=http://<IP_PUBLICA>:8081
-🗺️ Roadmap✅ ImplementadoMicroservicios Spring Boot con JPA.Frontend React con Vite y Tailwind.Contenerización completa (Docker multi-stage).Infraestructura AWS refactorizada y modularizada con Terraform.CI/CD con GitHub Actions.Health checks y logs centralizados.
+🏃 Ejecución Local
+Para levantar el entorno de desarrollo:
+
+Bash
+# 1. Instalar dependencias usando pnpm
+pnpm install
+
+# 2. Levantar servidor local (Abre en localhost:5173)
+pnpm dev
+
+# 3. Compilar para producción (Opcional)
+pnpm build
+🐳 Despliegue en Producción
+El Dockerfile utiliza un proceso multi-stage (Node.js para construir, Nginx para servir). Nginx está configurado para manejar correctamente las rutas de React y cachear los archivos estáticos.
+
+
+---
+
+### 💡 ¿Cómo subir esto a GitHub?
+Una vez que hayas guardado cada archivo `README.md` en su respectiva carpeta, ejecuta estos comandos en tu terminal en la raíz del proyecto:
+
+```bash
+git add .
+git commit -m "docs: modularizar la documentacion del proyecto con READMEs especificos"
+git push origin tu-rama
+Con esta estructura, cuando alguien entre a la carpeta infrastructure en GitHub, verá automáticamente la documentación de Terraform, y cuando entre a frontend, verá cómo usar React. ¡Quedará nivel experto!
