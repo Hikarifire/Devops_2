@@ -1,0 +1,93 @@
+name: Despliegue Continuo - Feature Branch
+
+# 1. DISPARADOR: Configurado para actuar en ramas Feature y Main
+on:
+  push:
+    branches:
+      - main
+      - 'feature/*' # Rompe el candado: se activa con cualquier rama "feature/nombre"
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: despacho-project
+  SERVICE_NAME: app
+
+jobs:
+  deploy:
+    name: Core Deployment Pipeline
+    runs-on: ubuntu-latest
+
+    steps:
+      # ==========================================
+      # PASO 1: DESCARGAR EL CÓDIGO
+      # ==========================================
+      - name: 📥 Clonar repositorio en el runner
+        uses: actions/checkout@v4
+
+      # ==========================================
+      # PASO 2: LOGUEARSE EN AWS
+      # ==========================================
+      - name: 🔐 Configurar credenciales de AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }} # Requerido para AWS Academy
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ==========================================
+      # PASO 3: PREPARAR EL TERRENO (TERRAFORM)
+      # ==========================================
+      - name: 🏗️ Inicializar Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: 🚀 Aplicar cambios de Infraestructura
+        working-directory: ./terraform
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+      # ==========================================
+      # PASO 4: CONECTARSE AL ALMACÉN DE IMÁGENES
+      # ==========================================
+      - name: 🐳 Autenticar con Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ==========================================
+      # PASO 5: COMPILAR Y SUBIR CONTENEDORES
+      # ==========================================
+      - name: 📦 Build & Push: Backend Despachos
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPO:  despacho-project-backd-despacho
+        run: |
+          docker build -t $REGISTRY/$REPO:latest ./backend/back-despacho-service
+          docker push $REGISTRY/$REPO:latest
+
+      - name: 📦 Build & Push: Backend Ventas
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPO: despacho-project-backventas
+        run: |
+          docker build -t $REGISTRY/$REPO:latest ./backend/back-venta-service
+          docker push $REGISTRY/$REPO:latest
+
+      - name: 📦 Build & Push: Frontend
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPO: despacho-project-frontend
+        run: |
+          docker build -t $REGISTRY/$REPO:latest ./frontend
+          docker push $REGISTRY/$REPO:latest
+
+      # ==========================================
+      # PASO 6: REINICIAR LOS SERVICIOS EN LA NUBE
+      # ==========================================
+      - name: 🔄 Forzar actualización de contenedores en ECS
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.PROJECT_NAME }}-cluster \
+            --service ${{ env.SERVICE_NAME }} \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}

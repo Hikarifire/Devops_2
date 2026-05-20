@@ -1,64 +1,86 @@
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
+provider "aws" { 
+  region = "us-east-1"
+} 
+
+# ==========================================
+# RED (VPC, Subnets, Gateways)
+# ==========================================
+resource "aws_vpc" "vpc_innovatech_produccion" {
+  cidr_block           = "10.0.0.0/16"          
+  enable_dns_hostnames = true                    
+  tags                 = { Name = "VPC-Innovatech-Chile" }
 }
 
-provider "aws" {
-  region = var.aws_region
+resource "aws_subnet" "subnet_publica_frontend" {
+  vpc_id                  = aws_vpc.vpc_innovatech_produccion.id
+  cidr_block              = "10.0.1.0/24"        
+  map_public_ip_on_launch = true                 
+  tags                    = { Name = "Subnet-Publica-Frontend" }
 }
 
-############################
-# VPC
-############################
+resource "aws_subnet" "subnet_privada_backend_data" {
+  vpc_id     = aws_vpc.vpc_innovatech_produccion.id
+  cidr_block = "10.0.2.0/24"                      
+  tags       = { Name = "Subnet-Privada-App" }
+}         
 
-resource "aws_vpc" "main" {
-  cidr_block           = "10.0.0.0/16"
-  enable_dns_hostnames = true
-}
+resource "aws_internet_gateway" "igw_innovatech" {
+  vpc_id = aws_vpc.vpc_innovatech_produccion.id
+  tags   = { Name = "IGW-Innovatech" }
+}  
 
-resource "aws_subnet" "public" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.1.0/24"
-  availability_zone       = "${var.aws_region}a"
-  map_public_ip_on_launch = true
-}
+resource "aws_eip" "eip_nat" {
+  domain     = "vpc"   
+  depends_on = [aws_internet_gateway.igw_innovatech]
+}                         
 
-resource "aws_internet_gateway" "main" {
-  vpc_id = aws_vpc.main.id
-}
+resource "aws_nat_gateway" "nat_gateway_privado" {
+  allocation_id = aws_eip.eip_nat.id              
+  subnet_id     = aws_subnet.subnet_publica_frontend.id
+  tags          = { Name = "NAT-Innovatech" }
+  depends_on    = [aws_internet_gateway.igw_innovatech]
+}  
 
-resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.main.id
+# ==========================================
+# TABLAS DE ENRUTAMIENTO 
+# ==========================================
+resource "aws_route_table" "rt_publica" {
+  vpc_id = aws_vpc.vpc_innovatech_produccion.id
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.main.id
+    gateway_id = aws_internet_gateway.igw_innovatech.id
   }
+  tags = { Name = "RT-Publica-Innovatech" }
 }
 
-resource "aws_route_table_association" "public" {
-  subnet_id      = aws_subnet.public.id
-  route_table_id = aws_route_table.public.id
+resource "aws_route_table_association" "rta_publica_frontend" {
+  subnet_id      = aws_subnet.subnet_publica_frontend.id
+  route_table_id = aws_route_table.rt_publica.id
 }
 
-############################
-# SECURITY GROUP
-############################
+resource "aws_route_table" "rt_privada" {
+  vpc_id = aws_vpc.vpc_innovatech_produccion.id
 
-resource "aws_security_group" "main" {
-  name   = "${var.project_name}-sg"
-  vpc_id = aws_vpc.main.id
-
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.nat_gateway_privado.id
   }
+  tags = { Name = "RT-Privada-Innovatech" }
+}
+
+resource "aws_route_table_association" "rta_privada_backend" {
+  subnet_id      = aws_subnet.subnet_privada_backend_data.id
+  route_table_id = aws_route_table.rt_privada.id
+}
+
+# ==========================================
+# SECURITY GROUPS
+# ==========================================
+resource "aws_security_group" "sg_capa_frontend" {
+  name   = "SG-Frontend-Innovatech"
+  vpc_id = aws_vpc.vpc_innovatech_produccion.id
+
   ingress {
     from_port   = 80
     to_port     = 80
@@ -67,8 +89,8 @@ resource "aws_security_group" "main" {
   }
 
   ingress {
-    from_port   = 8080
-    to_port     = 8080
+    from_port   = 22
+    to_port     = 22
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -80,265 +102,93 @@ resource "aws_security_group" "main" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
-resource "aws_security_group_rule" "mysql_internal" {
-  type                     = "ingress"
-  from_port                = 3306
-  to_port                  = 3306
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.main.id
-  source_security_group_id = aws_security_group.main.id
+
+resource "aws_security_group" "sg_capa_backend" {
+  name   = "SG-Backend-Innovatech"
+  vpc_id = aws_vpc.vpc_innovatech_produccion.id
+  
+  ingress {
+    from_port       = 8080
+    to_port         = 8080
+    protocol        = "tcp"
+    security_groups = [aws_security_group.sg_capa_frontend.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 }
 
-############################
-# ECR
-############################
+resource "aws_security_group" "sg_capa_datos" {
+  name   = "SG-Datos-Innovatech"
+  vpc_id = aws_vpc.vpc_innovatech_produccion.id
+
+  ingress {
+    from_port       = 3306 
+    to_port         = 3306
+    protocol        = "tcp"
+    security_groups = [aws_security_group.sg_capa_backend.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# ==========================================
+# CÓMPUTO (Launch Templates & EC2)
+# ==========================================
+resource "aws_launch_template" "template_instancias_devops" {
+  name_prefix   = "Innovatech-Standard-"
+  image_id      = "ami-0c7217cdde317cfec" 
+  instance_type = "t2.micro"
+  
+  user_data = base64encode(<<-EOF
+    #!/bin/bash
+    apt-get update -y                             
+    apt-get install -y git docker.io              
+    systemctl start docker                        
+    systemctl enable docker                       
+  EOF
+  )
+}
+
+resource "aws_instance" "ec2_frontend" {
+  launch_template { id = aws_launch_template.template_instancias_devops.id }
+  subnet_id              = aws_subnet.subnet_publica_frontend.id 
+  vpc_security_group_ids = [aws_security_group.sg_capa_frontend.id]
+  tags                   = { Name = "EC2-Frontend-Innovatech" }
+}
+
+resource "aws_instance" "ec2_backend" {
+  launch_template { id = aws_launch_template.template_instancias_devops.id }
+  subnet_id              = aws_subnet.subnet_privada_backend_data.id 
+  vpc_security_group_ids = [aws_security_group.sg_capa_backend.id]
+  tags                   = { Name = "EC2-Backend-Innovatech" }
+}
+
+resource "aws_instance" "ec2_datos" {
+  launch_template { id = aws_launch_template.template_instancias_devops.id }
+  subnet_id              = aws_subnet.subnet_privada_backend_data.id 
+  vpc_security_group_ids = [aws_security_group.sg_capa_datos.id]
+  tags                   = { Name = "EC2-Datos-Innovatech" }
+}
+
+# ==========================================
+# REPOSITORIOS ECR (Imágenes Docker)
+# ==========================================
+resource "aws_ecr_repository" "frontend" {
+  name                 = "frontend-innovatech"
+  image_tag_mutability = "MUTABLE"
+}
 
 resource "aws_ecr_repository" "backend" {
-  name         = "${var.project_name}-backend"
-  force_delete = true
-}
-
-resource "aws_ecr_repository" "frontend" {
-  name         = "${var.project_name}-frontend"
-  force_delete = true
-}
-
-############################
-# EC2 MYSQL
-############################
-
-data "aws_ami" "amazon_linux" {
-  most_recent = true
-  owners      = ["amazon"]
-
-  filter {
-    name   = "name"
-    values = ["al2023-ami-*-x86_64"]
-  }
-}
-
-resource "aws_instance" "db" {
-  ami                    = data.aws_ami.amazon_linux.id
-  instance_type          = "t3.micro"
-  subnet_id              = aws_subnet.public.id
-  vpc_security_group_ids = [aws_security_group.main.id]
-  key_name               = var.key_pair_name
-
-  # 🔹 Aumenta disco (clave)
-  root_block_device {
-    volume_size = 20
-    volume_type = "gp3"
-  }
-
-  user_data = <<-EOF
-    #!/bin/bash
-
-    yum update -y
-    yum install -y docker
-
-    systemctl start docker
-    systemctl enable docker
-
-    # Esperar a que Docker esté realmente listo
-    until docker info > /dev/null 2>&1; do
-      echo "Esperando Docker..."
-      sleep 3
-    done
-
-    # Limpiar espacio por si acaso
-    docker system prune -af
-
-    # Levantar MySQL optimizado
-    docker run -d \
-    --name mysql \
-    -e MYSQL_ROOT_PASSWORD=root \
-    -e MYSQL_DATABASE=asistencia_db \
-    -e MYSQL_ROOT_HOST=% \
-    -p 3306:3306 \
-    --log-opt max-size=10m \
-    --log-opt max-file=3 \
-    mysql:8-oracle \
-    --bind-address=0.0.0.0 \
-    --performance-schema=OFF
-  EOF
-
-  tags = {
-    Name = "${var.project_name}-mysql"
-  }
-}
-
-#CLOUD WATCH
-resource "aws_cloudwatch_log_group" "ecs" {
-  name              = "/ecs/${var.project_name}"
-  retention_in_days = 7
-}
-
-############################
-# ECS
-############################
-
-resource "aws_ecs_cluster" "main" {
-  name = "${var.project_name}-cluster"
-}
-
-data "aws_iam_role" "lab" {
-  name = "LabRole"
-}
-
-############################
-# TASK APP (frontend + backend)
-############################
-
-resource "aws_ecs_task_definition" "app" {
-  family                   = "${var.project_name}-app"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = "1024"
-  memory                   = "2048"
-  execution_role_arn       = data.aws_iam_role.lab.arn
-
-  container_definitions = jsonencode([
-
-    {
-      name  = "back-Ventas_SpringBoot"
-      image = "${aws_ecr_repository.backend.repository_url}:latest"
-
-      portMappings = [
-        {
-          containerPort = 8080
-        }
-      ]
-      healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health/readiness || exit 1"]
-        interval    = 30
-        timeout     = 5
-        retries     = 5
-        startPeriod = 120
-      }
-
-
-      environment = [
-        {
-            name  = "DB_HOST",
-            value = aws_instance.db.private_ip
-        },
-        {
-            name  = "SPRING_DATASOURCE_URL"
-            value = "jdbc:mysql://${aws_instance.db.private_ip}:3306/asistencia_db"
-        },
-        {
-            name  = "SPRING_DATASOURCE_USERNAME"
-            value = "root"
-        },
-        {
-            name  = "SPRING_DATASOURCE_PASSWORD"
-            value = "root"
-        }
-      ]
-      logConfiguration = {
-        logDriver = "awslogs",
-        options = {
-          awslogs-group         = aws_cloudwatch_log_group.ecs.name,
-          awslogs-region        = var.aws_region,
-          awslogs-stream-prefix = "backend"
-        }
-      }
-    },
- {
-      name  = "back-Despachos_SpringBoot"
-      image = "${aws_ecr_repository.backend.repository_url}:latest"
-
-      portMappings = [
-        {
-          containerPort = 8080
-        }
-      ]
-      healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health/readiness || exit 1"]
-        interval    = 30
-        timeout     = 5
-        retries     = 5
-        startPeriod = 120
-      }
-
-
-      environment = [
-        {
-            name  = "DB_HOST",
-            value = aws_instance.db.private_ip
-        },
-        {
-            name  = "SPRING_DATASOURCE_URL"
-            value = "jdbc:mysql://${aws_instance.db.private_ip}:3306/asistencia_db"
-        },
-        {
-            name  = "SPRING_DATASOURCE_USERNAME"
-            value = "root"
-        },
-        {
-            name  = "SPRING_DATASOURCE_PASSWORD"
-            value = "root"
-        }
-      ]
-      logConfiguration = {
-        logDriver = "awslogs",
-        options = {
-          awslogs-group         = aws_cloudwatch_log_group.ecs.name,
-          awslogs-region        = var.aws_region,
-          awslogs-stream-prefix = "backend"
-        }
-      }
-    },
-
-    {
-      name  = "front_despacho"
-      image = "${aws_ecr_repository.frontend.repository_url}:latest"
-
-      portMappings = [
-        {
-          containerPort = 80
-        }
-      ]
-
-      dependsOn = [
-        {
-          containerName = "back-Despachos_SpringBoot",
-          condition = "START"
-        }
-      ]
-      logConfiguration = {
-        logDriver = "awslogs",
-        options = {
-          awslogs-group         = aws_cloudwatch_log_group.ecs.name,
-          awslogs-region        = var.aws_region,
-          awslogs-stream-prefix = "frontend"
-        }
-      }
-      
-    }
-
-  ])
-}
-
-############################
-# SERVICE
-############################
-
-resource "aws_ecs_service" "app" {
-  name            = "app"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.app.arn
-  launch_type     = "FARGATE"
-  desired_count   = 1
-
-  force_new_deployment = true
-
-  deployment_minimum_healthy_percent = 0
-  deployment_maximum_percent         = 100
-
-  network_configuration {
-    subnets          = [aws_subnet.public.id]
-    security_groups  = [aws_security_group.main.id]
-    assign_public_ip = true
-  }
+  name                 = "backend-innovatech"
+  image_tag_mutability = "MUTABLE"
 }

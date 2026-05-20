@@ -4,6 +4,3 @@ output "backend_ecr" {
 output "frontend_ecr" {
   value = aws_ecr_repository.frontend.repository_url
 }
-output "mysql_ip" {
-  value = aws_instance.db.public_ip
-}
