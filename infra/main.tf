@@ -126,7 +126,7 @@ resource "aws_instance" "db" {
 
   # 🔹 Aumenta disco (clave)
   root_block_device {
-    volume_size = 20
+    volume_size = 35
     volume_type = "gp3"
   }
 
@@ -205,7 +205,7 @@ resource "aws_ecs_task_definition" "app" {
 
       portMappings = [
         {
-          containerPort = 8080
+          containerPort = 8081
         }
       ]
       healthCheck = {
