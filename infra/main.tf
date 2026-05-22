@@ -72,7 +72,7 @@ resource "aws_security_group" "main" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  
+
   ingress {
     from_port   = 8081
     to_port     = 8081
@@ -101,11 +101,11 @@ resource "aws_security_group_rule" "mysql_internal" {
 # ECR
 ############################
 
-resource "aws_ecr_repository" "backend" {
+resource "aws_ecr_repository" "backend_despacho" {
   name         = "${var.project_name}-backd-despacho"
   force_delete = true
 }
-resource "aws_ecr_repository" "backend" {
+resource "aws_ecr_repository" "backend_ventas" {
   name         = "${var.project_name}-backventas"
   force_delete = true
 }
@@ -212,10 +212,10 @@ resource "aws_ecs_task_definition" "app" {
 
   container_definitions = jsonencode([
 
-    
- {
+
+    {
       name  = "back-Despachos"
-      image = "${aws_ecr_repository.backend.repository_url}:latest"
+      image = "${aws_ecr_repository.backend_despacho.repository_url}:latest"
 
       portMappings = [
         {
@@ -232,14 +232,14 @@ resource "aws_ecs_task_definition" "app" {
 
 
       environment = [
-        { name = "SPRING_DATASOURCE_URL", 
-          value = "jdbc:mysql://${aws_instance.db.private_ip}:3306/${var.db_name}?useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true" },
-        { name = "SPRING_DATASOURCE_USERNAME", 
-          value = "root" },
-        { name = "SPRING_DATASOURCE_PASSWORD", 
-          value = var.db_password },
-        { name = "DB_HOST", 
-          value = aws_instance.db.private_ip }
+        { name = "SPRING_DATASOURCE_URL",
+        value = "jdbc:mysql://${aws_instance.db.private_ip}:3306/${var.db_name}?useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true" },
+        { name = "SPRING_DATASOURCE_USERNAME",
+        value = "root" },
+        { name = "SPRING_DATASOURCE_PASSWORD",
+        value = var.db_password },
+        { name = "DB_HOST",
+        value = aws_instance.db.private_ip }
       ]
       logConfiguration = {
         logDriver = "awslogs",
@@ -253,9 +253,9 @@ resource "aws_ecs_task_definition" "app" {
 
     {
       name  = "back-Ventas"
-      image = "${aws_ecr_repository.backend.repository_url}:latest"
+      image = "${aws_ecr_repository.backend_ventas.repository_url}:latest"
       portMappings = [
-        {containerPort = 8080}
+        { containerPort = 8082 }
       ]
       healthCheck = {
         command     = ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health/readiness || exit 1"]
@@ -266,14 +266,14 @@ resource "aws_ecs_task_definition" "app" {
       }
 
       environment = [
-        { name = "SPRING_DATASOURCE_URL",      
-          value = "jdbc:mysql://${aws_instance.db.private_ip}:3306/${var.db_name}?useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true" },
-        { name = "SPRING_DATASOURCE_USERNAME", 
-          value = "root" },
-        { name = "SPRING_DATASOURCE_PASSWORD", 
-          value = var.db_password },
-        { name = "DB_HOST", 
-          value = aws_instance.db.private_ip }
+        { name = "SPRING_DATASOURCE_URL",
+        value = "jdbc:mysql://${aws_instance.db.private_ip}:3306/${var.db_name}?useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true" },
+        { name = "SPRING_DATASOURCE_USERNAME",
+        value = "root" },
+        { name = "SPRING_DATASOURCE_PASSWORD",
+        value = var.db_password },
+        { name = "DB_HOST",
+        value = aws_instance.db.private_ip }
       ]
       logConfiguration = {
         logDriver = "awslogs",
@@ -296,10 +296,10 @@ resource "aws_ecs_task_definition" "app" {
       ]
 
       dependsOn = [
-        { containerName = "backend-despachos", 
-          condition = "START" },
-        { containerName = "backend-ventas",    
-          condition = "START" }
+        { containerName = "back-Despachos",
+        condition = "START" },
+        { containerName = "back-Ventas",
+        condition = "START" }
       ]
       logConfiguration = {
         logDriver = "awslogs",
@@ -309,7 +309,7 @@ resource "aws_ecs_task_definition" "app" {
           awslogs-stream-prefix = "frontend"
         }
       }
-      
+
     }
 
   ])
