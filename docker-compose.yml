@@ -15,7 +15,7 @@ services:
       retries: 5
 
   backend:
-    build: ./back-Despachos_SpringBoot
+    build: ./back-Despachos
     image: Despachos-backend:1.0
     ports:
       - "8080:8080"
@@ -28,7 +28,7 @@ services:
         condition: service_healthy
 
   backend:
-    build: ./back-Ventas_SpringBoot
+    build: ./back-Ventas
     image: Ventas-backend:1.0
     ports:
       - "8080:8080"
